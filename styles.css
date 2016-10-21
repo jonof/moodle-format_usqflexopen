@@ -11,7 +11,17 @@
 .course-content ul.usqflexopen li.section .section_action_menu .textmenu,
 .course-content ul.usqflexopen li.section .section_action_menu .menu-action-text { white-space: nowrap; }
 
-.course-content ul.usqflexopen li.section .label.sectiontype { float: right; }
+.course-content ul.usqflexopen li.section .sectiontype {
+    display: inline-block;
+    padding: 0.25rem 0.4rem;
+    font-size: 60%;
+    line-height: 1;
+    font-weight: bold;
+    color: #fff;
+    vertical-align: baseline;
+    float: right;
+    border-radius: 0.25em;
+}
 .course-content ul.usqflexopen li.section .sectiontype-assess { background-color: #b94a48; }
 .course-content ul.usqflexopen li.section .sectiontype-getstarted { background-color: #333333; }
 .course-content ul.usqflexopen li.section .sectiontype-week { background-color: #468847; }

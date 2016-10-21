@@ -77,7 +77,7 @@ class format_usqflexopen_renderer extends format_section_renderer_base {
                 $courseformatoptions['defaultsectiontype'] :
                 $section->sectiontype;
 
-            $labelinsert = '<span class="label sectiontype sectiontype-'.$sectiontype.'">' .
+            $labelinsert = '<span class="sectiontype sectiontype-'.$sectiontype.'">' .
                 get_string('sectiontype' . $sectiontype, 'format_usqflexopen') . '</span>';
             $o = preg_replace(
                     '~(<h3 class="sectionname[^"]*">.+?)(</h3>)~',
