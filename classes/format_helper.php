@@ -25,10 +25,10 @@ use coding_exception;
  */
 class format_helper {
     /**
-     * The course.
-     * @var object
+     * The course id.
+     * @var integer
      */
-    private $course;
+    private $courseid;
 
     /**
      * The course format.
@@ -64,7 +64,7 @@ class format_helper {
         require_once $CFG->dirroot . '/course/lib.php';
         require_once $CFG->dirroot . '/course/modlib.php';
 
-        $this->course = $DB->get_record('course', array('id' => $course->id));
+        $this->courseid = $course->id;
 
         $this->courseformat = course_get_format($course);
 
@@ -84,13 +84,35 @@ class format_helper {
     }
 
     /**
+     * Fetches the course record, because we can't rely on a cached copy.
+     * @return object
+     */
+    private function get_course() {
+        global $DB;
+        return $DB->get_record('course', ['id' => $this->courseid], '*', MUST_EXIST);
+    }
+
+    /**
      * Creates a new section in the course.
      * @param string $sectiontype
      * @return section_info
      */
     public function create_section($sectiontype) {
         $this->lastsection += 1;
-        course_create_sections_if_missing($this->course, $this->lastsection);
+        course_create_sections_if_missing($this->courseid, $this->lastsection);
+
+        // Set the section details. get_fast_modinfo() reloads new data.
+        $info = get_fast_modinfo($this->courseid)->get_section_info($this->lastsection);
+        $data = array(
+            'id' => $info->id,
+            'sectiontype' => $sectiontype,
+        );
+        $this->courseformat->update_section_format_options($data);
+
+        // Move the section into place.
+        if (!move_section_to($this->get_course(), $this->lastsection, $this->sectioninsert, true)) {
+            throw new coding_exception('move_section_to failed');
+        }
 
         // Increase the course section count.
         $this->numsections += 1;
@@ -99,21 +121,8 @@ class format_helper {
         );
         $this->courseformat->update_course_format_options($data);
 
-        // Set the section details.
-        $info = get_fast_modinfo($this->course)->get_section_info($this->lastsection);
-        $data = array(
-            'id' => $info->id,
-            'sectiontype' => $sectiontype,
-        );
-        $this->courseformat->update_section_format_options($data);
-
-        // Move the section into place.
-        if (!move_section_to($this->course, $this->lastsection, $this->sectioninsert)) {
-            throw new coding_exception('move_section_to failed');
-        }
-
         // Get the final section information and prepare for the next one.
-        $info = get_fast_modinfo($this->course)->get_section_info($this->sectioninsert);
+        $info = get_fast_modinfo($this->courseid)->get_section_info($this->sectioninsert);
         $this->sectioninsert += 1;
         return $info;
     }
