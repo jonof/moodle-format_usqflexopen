@@ -77,8 +77,12 @@ class format_usqflexopen_renderer extends format_section_renderer_base {
                 $courseformatoptions['defaultsectiontype'] :
                 $section->sectiontype;
 
-            $o = str_replace('</h3>', '<span class="label sectiontype sectiontype-'.$sectiontype.'">' .
-                get_string('sectiontype' . $sectiontype, 'format_usqflexopen') . '</span></h3>', $o);
+            $labelinsert = '<span class="label sectiontype sectiontype-'.$sectiontype.'">' .
+                get_string('sectiontype' . $sectiontype, 'format_usqflexopen') . '</span>';
+            $o = preg_replace(
+                    '~(<h3 class="sectionname[^"]*">.+?)(</h3>)~',
+                    '$1'.$labelinsert.'$2',
+                    $o);
         }
         return $o;
     }
