@@ -55,9 +55,25 @@ class format_usqflexopen extends format_base {
         $section = $this->get_section($section);
         if ((string)$section->name !== '') {
             // Return the name the user set.
-            return format_string($section->name, true, array('context' => context_course::instance($this->courseid)));
+            return format_string($section->name, true,
+                array('context' => context_course::instance($this->courseid)));
         } else {
             return $this->get_default_section_name($section);
+        }
+    }
+
+    /**
+     * Returns the effective section type of a section (resolving 'default' to the course default).
+     * @param object $sectioninfo the section object
+     * @param object $course the course object
+     * @return string the effective section type
+     */
+    private function get_section_type($sectioninfo) {
+        $courseformatoptions = $this->get_format_options();
+        if (!isset($sectioninfo->sectiontype) || $sectioninfo->sectiontype === 'default') {
+            return $courseformatoptions['defaultsectiontype'];
+        } else {
+            return $sectioninfo->sectiontype;
         }
     }
 
@@ -79,10 +95,7 @@ class format_usqflexopen extends format_base {
             $thissectioninfo = $sectioninfoall[$section->section];
 
             $courseformatoptions = $this->get_format_options();
-            $thissectiontype = (!isset($thissectioninfo->sectiontype) ||
-                $thissectioninfo->sectiontype === 'default') ?
-                    $courseformatoptions['defaultsectiontype'] :
-                    $thissectioninfo->sectiontype;
+            $thissectiontype = $this->get_section_type($thissectioninfo);
 
             $numoftype = 0;
             foreach ($sectioninfoall as $sectionnum => $sectioninfo) {
@@ -90,10 +103,7 @@ class format_usqflexopen extends format_base {
                     continue;
                 }
 
-                $sectiontype = (!isset($sectioninfo->sectiontype) ||
-                    $sectioninfo->sectiontype === 'default') ?
-                        $courseformatoptions['defaultsectiontype'] :
-                        $sectioninfo->sectiontype;
+                $sectiontype = $this->get_section_type($sectioninfo);
 
                 if ($sectiontype == $thissectiontype) {
                     $numoftype++;
@@ -282,13 +292,10 @@ class format_usqflexopen extends format_base {
         $course = $this->get_course();
         $modinfo = get_fast_modinfo($course);
         $renderer = $this->get_renderer($PAGE);
-        $courseformatoptions = course_get_format($course)->get_format_options();
         if ($renderer && ($sections = $modinfo->get_section_info_all())) {
             foreach ($sections as $number => $section) {
                 $titles[$number] = $renderer->section_title($section, $course);
-                $types[$number] = $section->sectiontype === 'default' ?
-                    $courseformatoptions['defaultsectiontype'] :
-                    $section->sectiontype;
+                $types[$number] = $this->get_section_type($section);
                 if ($this->is_section_current($section)) {
                     $current = $number;
                 }
@@ -578,9 +585,21 @@ class format_usqflexopen extends format_base {
         if (!is_object($section)) {
             throw new coding_exception('is_section_current');
         }
-        if ($section->section < 1 || $section->sectiontype != 'week') {
+
+        if ($section->section < 1) {
+            // No highlighting the general section.
             return false;
         }
+
+        $course = $this->get_course();
+        if ($course->marker == $section->section) {
+            // The section is highlighted.
+            return true;
+        } else if ($this->get_section_type($section) != 'week' || $course->marker > 0) {
+            // Not a week section, or another section is highlighted.
+            return false;
+        }
+
         $timenow = time();
 
         $sectioninfoall = $this->get_sections();
@@ -589,7 +608,7 @@ class format_usqflexopen extends format_base {
             if ($sectionnum == 0) {
                 continue;
             }
-            if ($sectioninfo->sectiontype == 'week') {
+            if ($this->get_section_type($sectioninfo) == 'week') {
                 $numoftype++;
             }
             if ($sectioninfo->section == $section->section) {

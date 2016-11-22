@@ -38,6 +38,21 @@ require_once($CFG->dirroot.'/course/format/usqflexopen/lib.php');
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class format_usqflexopen_renderer extends format_section_renderer_base {
+
+    /**
+     * Constructor method, calls the parent constructor
+     *
+     * @param moodle_page $page
+     * @param string $target one of rendering target constants
+     */
+    public function __construct(moodle_page $page, $target) {
+        parent::__construct($page, $target);
+
+        // Since format_topics_renderer::section_edit_controls() only displays the 'Set current section' control when editing mode is on
+        // we need to be sure that the link 'Turn editing mode on' is available for a user who does not have any other managing capability.
+        $page->set_other_editing_capability('moodle/course:setcurrentsection');
+    }
+
     /**
      * Generate the starting container html for a list of sections
      * @return string HTML to output.
@@ -66,21 +81,33 @@ class format_usqflexopen_renderer extends format_section_renderer_base {
      * @return string the page title
      */
     protected function page_title() {
-        return get_string('weeklyoutline');
+        return get_string('topicoutline');
+    }
+
+    /**
+     * Returns the effective section type of a section (resolving 'default' to the course default).
+     * @param object $section the section object
+     * @param object $course the course object
+     * @return string the effective section type
+     */
+    private function get_section_type($section, $course) {
+        $courseformatoptions = course_get_format($course)->get_format_options();
+        if (!isset($section->sectiontype) || $section->sectiontype === 'default') {
+            return $courseformatoptions['defaultsectiontype'];
+        } else {
+            return $section->sectiontype;
+        }
     }
 
     protected function section_header($section, $course, $onsectionpage, $sectionreturn=null) {
         $o = parent::section_header($section, $course, $onsectionpage, $sectionreturn);
         if ($section->section > 0) {
-            $courseformatoptions = course_get_format($course)->get_format_options();
-            $sectiontype = $section->sectiontype === 'default' ?
-                $courseformatoptions['defaultsectiontype'] :
-                $section->sectiontype;
+            $sectiontype = $this->get_section_type($section, $course);
 
             $labelinsert = '<span class="sectiontype sectiontype-'.$sectiontype.'">' .
                 get_string('sectiontype' . $sectiontype, 'format_usqflexopen') . '</span>';
             $o = preg_replace(
-                    '~(<h3 class="sectionname[^"]*">.+?)(</h3>)~',
+                    '~(<h3 class="sectionname[^"]*">.+?)(</h3>)~s',
                     '$1'.$labelinsert.'$2',
                     $o);
         }
@@ -190,7 +217,7 @@ class format_usqflexopen_renderer extends format_section_renderer_base {
         echo $this->start_section_list();
 
         foreach ($modinfo->get_section_info_all() as $section => $thissection) {
-            if ($section == 0 || $thissection->sectiontype != $type) {
+            if ($section == 0 || $this->get_section_type($thissection, $course) != $type) {
                 continue;
             }
             if ($section > $course->numsections) {
@@ -246,5 +273,73 @@ class format_usqflexopen_renderer extends format_section_renderer_base {
         $o.= html_writer::end_tag('div');
         $o.= html_writer::end_tag('li');
         return $o;
+    }
+
+    /**
+     * Generate the edit control items of a section
+     *
+     * @param stdClass $course The course entry from DB
+     * @param stdClass $section The course_section entry from DB
+     * @param bool $onsectionpage true if being printed on a section page
+     * @return array of edit control items
+     */
+    protected function section_edit_control_items($course, $section, $onsectionpage = false) {
+        global $PAGE;
+
+        if (!$PAGE->user_is_editing()) {
+            return array();
+        }
+
+        $coursecontext = context_course::instance($course->id);
+
+        if ($onsectionpage) {
+            $url = course_get_url($course, $section->section);
+        } else {
+            $url = course_get_url($course);
+        }
+        $url->param('sesskey', sesskey());
+
+        $ishighlightable = in_array($this->get_section_type($section, $course), ['topic', 'assess']);
+        $isstealth = $section->section > $course->numsections;
+        $controls = array();
+        if ($ishighlightable && !$isstealth && $section->section && has_capability('moodle/course:setcurrentsection', $coursecontext)) {
+            if ($course->marker == $section->section) {  // Show the "light globe" on/off.
+                $url->param('marker', 0);
+                $markedthistopic = get_string('markedthistopic');
+                $highlightoff = get_string('highlightoff');
+                $controls['highlight'] = array('url' => $url, "icon" => 'i/marked',
+                                               'name' => $highlightoff,
+                                               'pixattr' => array('class' => '', 'alt' => $markedthistopic),
+                                               'attr' => array('class' => 'editing_highlight', 'title' => $markedthistopic));
+            } else {
+                $url->param('marker', $section->section);
+                $markthistopic = get_string('markthistopic');
+                $highlight = get_string('highlight');
+                $controls['highlight'] = array('url' => $url, "icon" => 'i/marker',
+                                               'name' => $highlight,
+                                               'pixattr' => array('class' => '', 'alt' => $markthistopic),
+                                               'attr' => array('class' => 'editing_highlight', 'title' => $markthistopic));
+            }
+        }
+
+        $parentcontrols = parent::section_edit_control_items($course, $section, $onsectionpage);
+
+        // If the edit key exists, we are going to insert our controls after it.
+        if (array_key_exists("edit", $parentcontrols)) {
+            $merged = array();
+            // We can't use splice because we are using associative arrays.
+            // Step through the array and merge the arrays.
+            foreach ($parentcontrols as $key => $action) {
+                $merged[$key] = $action;
+                if ($key == "edit") {
+                    // If we have come to the edit key, merge these controls here.
+                    $merged = array_merge($merged, $controls);
+                }
+            }
+
+            return $merged;
+        } else {
+            return array_merge($controls, $parentcontrols);
+        }
     }
 }
