@@ -35,6 +35,8 @@ require_once($CFG->dirroot. '/course/format/lib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class format_usqflexopen extends format_base {
+    // Leaves room after COURSE_DISPLAY_MULTIPAGE in case Moodle develop new modes.
+    const COURSE_DISPLAY_SEPARATEPAGE = 10;
 
     /**
      * Returns true if this course format uses sections
@@ -48,15 +50,16 @@ class format_usqflexopen extends format_base {
     /**
      * Returns the display name of the given section that the course prefers.
      *
+     * Use section name is specified by user. Otherwise use default ("Topic #")
+     *
      * @param int|stdClass $section Section object from database or just field section.section
      * @return string Display name that the course format prefers, e.g. "Topic 2"
      */
     public function get_section_name($section) {
         $section = $this->get_section($section);
         if ((string)$section->name !== '') {
-            // Return the name the user set.
             return format_string($section->name, true,
-                array('context' => context_course::instance($this->courseid)));
+                    array('context' => context_course::instance($this->courseid)));
         } else {
             return $this->get_default_section_name($section);
         }
@@ -64,17 +67,73 @@ class format_usqflexopen extends format_base {
 
     /**
      * Returns the effective section type of a section (resolving 'default' to the course default).
-     * @param object $sectioninfo the section object
+     * @param int|stdClass|section_info $section the section
      * @param object $course the course object
      * @return string the effective section type
      */
-    private function get_section_type($sectioninfo) {
-        $courseformatoptions = $this->get_format_options();
+    public function get_section_type($section) {
+        if ($section instanceof section_info) {
+            $sectioninfo = $section;
+        } else {
+            $sectioninfo = $this->get_section($section);
+        }
         if (!isset($sectioninfo->sectiontype) || $sectioninfo->sectiontype === 'default') {
+            $courseformatoptions = $this->get_format_options();
             return $courseformatoptions['defaultsectiontype'];
         } else {
             return $sectioninfo->sectiontype;
         }
+    }
+
+    /**
+     * Returns the ordinal position of the given section within those of a given type.
+     * @param section_info $sectioninfo the section object
+     * @param string $sectiontype null for sections of the same type as $sectioninfo, otherwise an explicit type
+     * @return integer the position, or 0 if not a valid section or $sectioninfo is not of $sectiontype
+     */
+    public function get_section_number_of_type(section_info $sectioninfo, $sectiontype = null) {
+        if ($sectiontype === null) {
+            $sectiontype = $this->get_section_type($sectioninfo);
+        }
+
+        $numoftype = 0;
+        foreach ($this->get_sections() as $sinfo) {
+            if ($sinfo->section == 0) {
+                continue;
+            }
+            if ($this->get_section_type($sinfo) == $sectiontype) {
+                $numoftype++;
+            }
+            if ($sinfo->section == $sectioninfo->section) {
+                return $numoftype;
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Returns the count of sections of a given type.
+     * @param section_info $sectioninfo the section object or null if $sectiontype is known
+     * @param string $sectiontype null for sections of the same type as $sectioninfo, otherwise an explicit type
+     * @return integer the position, or 0 if not a valid section or $sectioninfo is not of $sectiontype
+     */
+    public function get_section_count_of_type(section_info $sectioninfo = null, $sectiontype = null) {
+        if ($sectiontype === null && $sectioninfo) {
+            $sectiontype = $this->get_section_type($sectioninfo);
+        } elseif (!$sectioninfo && !$sectiontype) {
+            throw new coding_exception('both sectioninfo and sectiontype are null');
+        }
+
+        $numoftype = 0;
+        foreach ($this->get_sections() as $sinfo) {
+            if ($sinfo->section == 0) {
+                continue;
+            }
+            if ($this->get_section_type($sinfo) == $sectiontype) {
+                $numoftype++;
+            }
+        }
+        return $numoftype;
     }
 
     /**
@@ -91,31 +150,12 @@ class format_usqflexopen extends format_base {
             // Return the general section.
             return get_string('section0name', 'format_usqflexopen');
         } else {
-            $sectioninfoall = $this->get_sections();
-            $thissectioninfo = $sectioninfoall[$section->section];
-
-            $courseformatoptions = $this->get_format_options();
+            $thissectioninfo = $this->get_section($section);
             $thissectiontype = $this->get_section_type($thissectioninfo);
-
-            $numoftype = 0;
-            foreach ($sectioninfoall as $sectionnum => $sectioninfo) {
-                if ($sectionnum == 0) {
-                    continue;
-                }
-
-                $sectiontype = $this->get_section_type($sectioninfo);
-
-                if ($sectiontype == $thissectiontype) {
-                    $numoftype++;
-                }
-                if ($sectioninfo->section == $thissectioninfo->section) {
-                    break;
-                }
-            }
 
             switch ($thissectiontype) {
                 case 'week':
-                    $dates = $this->get_section_dates($numoftype);
+                    $dates = $this->get_section_dates($thissectioninfo);
 
                     // We subtract 24 hours for display purposes.
                     $dates->end = ($dates->end - 86400);
@@ -130,6 +170,7 @@ class format_usqflexopen extends format_base {
 
                 case 'topic':
                 case 'assess':
+                    $numoftype = $this->get_section_number_of_type($thissectioninfo, $thissectiontype);
                     return get_string('sectiontype' . $thissectiontype, 'format_usqflexopen') . ' ' . $numoftype;
             }
 
@@ -172,7 +213,7 @@ class format_usqflexopen extends format_base {
             } else {
                 $usercoursedisplay = $course->coursedisplay;
             }
-            if ($sectionno != 0 && $usercoursedisplay == COURSE_DISPLAY_MULTIPAGE) {
+            if ($sectionno != 0 && $usercoursedisplay != COURSE_DISPLAY_SINGLEPAGE) {
                 $url->param('section', $sectionno);
             } else {
                 if (empty($CFG->linkcoursesections) && !empty($options['navigation'])) {
@@ -313,7 +354,7 @@ class format_usqflexopen extends format_base {
     public function get_default_blocks() {
         return array(
             BLOCK_POS_LEFT => array(),
-            BLOCK_POS_RIGHT => array('search_forums', 'news_items', 'calendar_upcoming', 'recent_activity')
+            BLOCK_POS_RIGHT => array()
         );
     }
 
@@ -322,7 +363,6 @@ class format_usqflexopen extends format_base {
      *
      * Weeks format uses the following options:
      * - coursedisplay
-     * - numsections
      * - hiddensections
      *
      * @param bool $foreditform
@@ -338,16 +378,12 @@ class format_usqflexopen extends format_base {
                     'type' => PARAM_ALPHA,
                 ),
                 'displaysectiontypegetstarted' => array(
-                    'default' => true,
+                    'default' => false,
                     'type' => PARAM_BOOL,
                 ),
                 'displaysectiontypeassess' => array(
-                    'default' => true,
+                    'default' => false,
                     'type' => PARAM_BOOL,
-                ),
-                'numsections' => array(
-                    'default' => $courseconfig->numsections,
-                    'type' => PARAM_INT,
                 ),
                 'hiddensections' => array(
                     'default' => $courseconfig->hiddensections,
@@ -396,11 +432,6 @@ class format_usqflexopen extends format_base {
                     'element_type' => 'advcheckbox',
                     'element_attributes' => array(),
                 ),
-                'numsections' => array(
-                    'label' => new lang_string('numberweeks'),
-                    'element_type' => 'select',
-                    'element_attributes' => array($sectionmenu),
-                ),
                 'hiddensections' => array(
                     'label' => new lang_string('hiddensections'),
                     'help' => 'hiddensections',
@@ -419,7 +450,8 @@ class format_usqflexopen extends format_base {
                     'element_attributes' => array(
                         array(
                             COURSE_DISPLAY_SINGLEPAGE => new lang_string('coursedisplay_single'),
-                            COURSE_DISPLAY_MULTIPAGE => new lang_string('coursedisplay_multi')
+                            COURSE_DISPLAY_MULTIPAGE => new lang_string('coursedisplay_multi'),
+                            self::COURSE_DISPLAY_SEPARATEPAGE => new lang_string('coursedisplay_separate', 'format_usqflexopen'),
                         )
                     ),
                     'help' => 'coursedisplay',
@@ -481,22 +513,33 @@ class format_usqflexopen extends format_base {
      * @return array array of references to the added form elements.
      */
     public function create_edit_form_elements(&$mform, $forsection = false) {
+        global $COURSE;
         $elements = parent::create_edit_form_elements($mform, $forsection);
 
-        // Increase the number of sections combo box values if the user has increased the number of sections
-        // using the icon on the course page beyond course 'maxsections' or course 'maxsections' has been
-        // reduced below the number of sections already set for the course on the site administration course
-        // defaults page.  This is so that the number of sections is not reduced leaving unintended orphaned
-        // activities / resources.
+        if (!$forsection && (empty($COURSE->id) || $COURSE->id == SITEID)) {
+            // Add "numsections" element to the create course form - it will force new course to be prepopulated
+            // with empty sections.
+            // The "Number of sections" option is no longer available when editing course, instead teachers should
+            // delete and add sections when needed.
+            $courseconfig = get_config('moodlecourse');
+            $max = (int)$courseconfig->maxsections;
+            $element = $mform->addElement('select', 'numsections', get_string('numberweeks'), range(0, $max ?: 52));
+            $mform->setType('numsections', PARAM_INT);
+            if (is_null($mform->getElementValue('numsections'))) {
+                $mform->setDefault('numsections', $courseconfig->numsections);
+            }
+            array_unshift($elements, $element);
+        }
+
         if (!$forsection) {
-            $maxsections = get_config('moodlecourse', 'maxsections');
-            $numsections = $mform->getElementValue('numsections');
-            $numsections = $numsections[0];
-            if ($numsections > $maxsections) {
-                $element = $mform->getElement('numsections');
-                for ($i = $maxsections+1; $i <= $numsections; $i++) {
-                    $element->addOption("$i", $i);
-                }
+            if (empty($this->courseid)) {
+                $context = context_system::instance();
+            } else {
+                $context = context_course::instance($this->courseid);
+            }
+            if (!has_capability('format/usqflexopen:editcourseoptions', $context)) {
+                $mform->hardFreeze('displaysectiontypegetstarted');
+                $mform->hardFreeze('displaysectiontypeassess');
             }
         }
         return $elements;
@@ -506,9 +549,7 @@ class format_usqflexopen extends format_base {
      * Updates format options for a course
      *
      * In case if course format was changed to 'usqflexopen', we try to copy options
-     * 'coursedisplay', 'numsections' and 'hiddensections' from the previous format.
-     * If previous course format did not have 'numsections' option, we populate it with the
-     * current number of sections
+     * 'coursedisplay' and 'hiddensections' from the previous format.
      *
      * @param stdClass|array $data return value from {@link moodleform::get_data()} or array with data
      * @param stdClass $oldcourse if this function is called from {@link update_course()}
@@ -516,7 +557,6 @@ class format_usqflexopen extends format_base {
      * @return bool whether there were any changes to the options values
      */
     public function update_course_format_options($data, $oldcourse = null) {
-        global $DB;
         $data = (array)$data;
         if ($oldcourse !== null) {
             $oldcourse = (array)$oldcourse;
@@ -525,51 +565,51 @@ class format_usqflexopen extends format_base {
                 if (!array_key_exists($key, $data)) {
                     if (array_key_exists($key, $oldcourse)) {
                         $data[$key] = $oldcourse[$key];
-                    } else if ($key === 'numsections') {
-                        // If previous format does not have the field 'numsections'
-                        // and $data['numsections'] is not set,
-                        // we fill it with the maximum section number from the DB
-                        $maxsection = $DB->get_field_sql('SELECT max(section) from {course_sections}
-                            WHERE course = ?', array($this->courseid));
-                        if ($maxsection) {
-                            // If there are no sections, or just default 0-section, 'numsections' will be set to default
-                            $data['numsections'] = $maxsection;
-                        }
                     }
                 }
             }
         }
-        $changed = $this->update_format_options($data);
-        if ($changed && array_key_exists('numsections', $data)) {
-            // If the numsections was decreased, try to completely delete the orphaned sections (unless they are not empty).
-            $numsections = (int)$data['numsections'];
-            $maxsection = $DB->get_field_sql('SELECT max(section) from {course_sections}
-                        WHERE course = ?', array($this->courseid));
-            for ($sectionnum = $maxsection; $sectionnum > $numsections; $sectionnum--) {
-                if (!$this->delete_section($sectionnum, false)) {
-                    break;
-                }
-            }
-        }
-        return $changed;
+        return $this->update_format_options($data);
     }
 
     /**
      * Return the start and end date of the passed section
      *
-     * @param int $sectionnum section to get the dates for
+     * @param int|stdClass|section_info $section section to get the dates for
+     * @param int $startdate Force course start date, useful when the course is not yet created
      * @return stdClass property start for startdate, property end for enddate
      */
-    public function get_section_dates($sectionnum) {
-        $course = $this->get_course();
+    public function get_section_dates($section, $startdate = false) {
+        if ($startdate === false) {
+            $course = $this->get_course();
+            $startdate = $course->startdate;
+        }
+
+        if ($section instanceof section_info) {
+            $sectioninfo = $section;
+        } else {
+            $sectioninfo = $this->get_section($section);
+        }
+
+        $isdatesection = false;
+        if ($this->get_section_type($sectioninfo) === 'week') {
+            $weeknum = $this->get_section_number_of_type($sectioninfo, 'week');
+            $isdatesection = ($weeknum > 0);
+        }
+        if (!$isdatesection) {
+            $dates = new stdClass();
+            $dates->start = 0;
+            $dates->end = 0;
+            return $dates;
+        }
 
         $oneweekseconds = 604800;
         // Hack alert. We add 2 hours to avoid possible DST problems. (e.g. we go into daylight
         // savings and the date changes.
-        $startdate = $course->startdate + 7200;
+        $startdate = $startdate + 7200;
 
         $dates = new stdClass();
-        $dates->start = $startdate + ($oneweekseconds * ($sectionnum - 1));
+        $dates->start = $startdate + ($oneweekseconds * ($weeknum - 1));
         $dates->end = $dates->start + $oneweekseconds;
 
         return $dates;
@@ -582,41 +622,33 @@ class format_usqflexopen extends format_base {
      * @return bool
      */
     public function is_section_current($section) {
-        if (!is_object($section)) {
-            throw new coding_exception('is_section_current');
+        if ($section instanceof section_info) {
+            $sectioninfo = $section;
+        } else {
+            $sectioninfo = $this->get_section($section);
         }
 
-        if ($section->section < 1) {
+        if ($sectioninfo->section < 1) {
             // No highlighting the general section.
             return false;
         }
 
         $course = $this->get_course();
-        if ($course->marker == $section->section) {
-            // The section is highlighted.
-            return true;
-        } else if ($this->get_section_type($section) != 'week' || $course->marker > 0) {
-            // Not a week section, or another section is highlighted.
+
+        if ($this->get_section_type($sectioninfo) !== 'week') {
+            // The section in question is not a week type. Is it highlighted though?
+            return ($course->marker == $sectioninfo->section);
+        }
+
+        // Has the highlight already been set on some other non-week section?
+        if ($course->marker > 0 && $this->get_section_type($course->marker) !== 'week') {
+            // Yes, so it takes priority.
             return false;
         }
 
+        // Figure out whether the section in question is the current week.
         $timenow = time();
-
-        $sectioninfoall = $this->get_sections();
-        $numoftype = 0;
-        foreach ($sectioninfoall as $sectionnum => $sectioninfo) {
-            if ($sectionnum == 0) {
-                continue;
-            }
-            if ($this->get_section_type($sectioninfo) == 'week') {
-                $numoftype++;
-            }
-            if ($sectioninfo->section == $section->section) {
-                break;
-            }
-        }
-
-        $dates = $this->get_section_dates($numoftype);
+        $dates = $this->get_section_dates($sectioninfo);
         return (($timenow >= $dates->start) && ($timenow < $dates->end));
     }
 
@@ -631,20 +663,77 @@ class format_usqflexopen extends format_base {
     public function can_delete_section($section) {
         return true;
     }
+
+    /**
+     * Indicates whether the course format supports the creation of a news forum.
+     *
+     * @return bool
+     */
+    public function supports_news() {
+        return true;
+    }
+
+    /**
+     * Returns whether this course format allows the activity to
+     * have "triple visibility state" - visible always, hidden on course page but available, hidden.
+     *
+     * @param stdClass|cm_info $cm course module (may be null if we are displaying a form for adding a module)
+     * @param stdClass|section_info $section section where this module is located or will be added to
+     * @return bool
+     */
+    public function allow_stealth_module_visibility($cm, $section) {
+        // Allow the third visibility state inside visible sections or in section 0.
+        return !$section->section || $section->visible;
+    }
+
+    public function section_action($section, $action, $sr) {
+        global $PAGE;
+
+        $ishighlightable = in_array($this->get_section_type($this->get_section($section)), ['topic', 'assess']);
+        if ($ishighlightable && $section->section && ($action === 'setmarker' || $action === 'removemarker')) {
+            // Format 'usqflexopen' allows to set and remove markers in addition to common section actions.
+            require_capability('moodle/course:setcurrentsection', context_course::instance($this->courseid));
+            course_set_marker($this->courseid, ($action === 'setmarker') ? $section->section : 0);
+            return null;
+        }
+
+        // For show/hide actions call the parent method and return the new content for .section_availability element.
+        $rv = parent::section_action($section, $action, $sr);
+        $renderer = $PAGE->get_renderer('format_usqflexopen');
+        $rv['section_availability'] = $renderer->section_availability($this->get_section($section));
+        return $rv;
+    }
 }
 
 function format_usqflexopen_extend_navigation_course($coursenode, $course, $coursecontext) {
     global $PAGE;
 
-    if ($course->format !== 'usqflexopen') {
-        return;
+    $caps = ['moodle/course:update', 'moodle/course:manageactivities'];
+    $items = array();
+
+    if ($PAGE->user_allowed_editing() && has_all_capabilities($caps, $coursecontext)) {
+        if ($course->format === 'usqflexopen') {
+            foreach (['assess', 'getstarted'] as $type) {
+                $typename = get_string('sectiontype' . $type, 'format_usqflexopen');
+                $items[] = [ get_string('createsection', 'format_usqflexopen', $typename),
+                    '/course/format/usqflexopen/createsection.php?id='.$course->id.'&type='.$type ];
+            }
+        }
     }
 
-    if ($PAGE->user_is_editing()) {
-        foreach (['assess', 'getstarted'] as $type) {
-            $typename = get_string('sectiontype' . $type, 'format_usqflexopen');
-            $coursenode->add(get_string('createsection', 'format_usqflexopen', $typename),
-                '/course/format/usqflexopen/createsection.php?id='.$course->id.'&type='.$type);
+    if ($items) {
+        $sectnode = $coursenode->add(get_string('pluginname', 'format_usqflexopen'));
+
+        if ($PAGE->user_is_editing()) {
+            foreach ($items as $item) {
+                list ($text, $url) = $item;
+                $sectnode->add($text, $url);
+            }
+        } else {
+            $editurl = clone($PAGE->url);
+            $editurl->param('sesskey', sesskey());
+            $editurl->param('edit', 'on');
+            $sectnode->add(get_string('turneditingon'), $editurl);
         }
     }
 }
@@ -666,4 +755,18 @@ function format_usqflexopen_inplace_editable($itemtype, $itemid, $newvalue) {
             array($itemid, 'usqflexopen'), MUST_EXIST);
         return course_get_format($section->course)->inplace_editable_update_section_name($section, $itemtype, $newvalue);
     }
+}
+
+/**
+ * Checks whether the current user has permission to view any grade reports.
+ * @param context $context
+ * @return boolean
+ */
+function format_usqflex_has_grade_report_cap(context $context) {
+    foreach (array_keys(core_component::get_plugin_list('gradereport')) as $plugin) {
+        if (has_capability('gradereport/'.$plugin.':view', $context)) {
+            return true;
+        }
+    }
+    return false;
 }

@@ -36,32 +36,6 @@ require_once($CFG->dirroot . '/course/lib.php');
  */
 class format_usqflexopen_testcase extends advanced_testcase {
 
-    public function test_update_course_numsections() {
-        global $DB;
-        $this->resetAfterTest(true);
-
-        $generator = $this->getDataGenerator();
-
-        $course = $generator->create_course(array('numsections' => 10, 'format' => 'usqflexopen'),
-            array('createsections' => true));
-        $generator->create_module('assign', array('course' => $course, 'section' => 7));
-
-        $this->setAdminUser();
-
-        $this->assertEquals(11, $DB->count_records('course_sections', array('course' => $course->id)));
-
-        // Change the numsections to 8, last two sections did not have any activities, they should be deleted.
-        update_course((object)array('id' => $course->id, 'numsections' => 8));
-        $this->assertEquals(9, $DB->count_records('course_sections', array('course' => $course->id)));
-        $this->assertEquals(9, count(get_fast_modinfo($course)->get_section_info_all()));
-
-        // Change the numsections to 5, section 8 should be deleted but section 7 should remain as it has activities.
-        update_course((object)array('id' => $course->id, 'numsections' => 6));
-        $this->assertEquals(8, $DB->count_records('course_sections', array('course' => $course->id)));
-        $this->assertEquals(8, count(get_fast_modinfo($course)->get_section_info_all()));
-        $this->assertEquals(6, course_get_format($course)->get_course()->numsections);
-    }
-
     /**
      * Tests for format_usqflexopen::get_section_name method with default section names.
      */
@@ -128,7 +102,8 @@ class format_usqflexopen_testcase extends advanced_testcase {
         // Generate a course with 5 sections.
         $generator = $this->getDataGenerator();
         $numsections = 5;
-        $course = $generator->create_course(array('numsections' => $numsections, 'format' => 'usqflexopen'),
+        $course = $generator->create_course(array('numsections' => $numsections, 'format' => 'usqflexopen',
+                'defaultsectiontype' => 'week'),
             array('createsections' => true));
 
         // Get section names for course.

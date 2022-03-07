@@ -1,0 +1,23 @@
+/* Styles to make presentable under Boost and its derivatives. */
+
+.course-content ul.usqflexopen {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+.course-content ul.usqflexopen li.section {
+    padding-bottom: 1rem;
+}
+.course-content ul.usqflexopen li.section.main {
+    margin-top: 1rem;
+}
+.course-content ul.usqflexopen li.section .summary,
+.course-content ul.usqflexopen li.section .content > .availabilityinfo {
+    margin-left: 25px;
+}
+.course-content ul.usqflexopen li.section .left,
+.course-content ul.usqflexopen li.section .right {
+    padding: 0 6px 0;
+    text-align: right;
+    width: auto;
+}

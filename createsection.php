@@ -1,4 +1,18 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
  * USQ Flexi course format
@@ -15,8 +29,6 @@ use format_usqflexopen\format_helper;
 $id = required_param('id', PARAM_INT);
 $type = required_param('type', PARAM_ALPHA);
 
-$sectiontypes = ['default', 'week', 'topic', 'assess', 'getstarted'];
-
 $PAGE->set_url('/course/format/usqflexopen/createsection.php', ['id' => $id, 'type' => $type]);
 
 require_login($id);
@@ -25,36 +37,12 @@ require_capability('moodle/course:manageactivities', $PAGE->context);
 
 $returnurl = course_get_url($COURSE);
 
-if (!in_array($type, $sectiontypes)) {
+if (!format_helper::is_valid_section_type($type)) {
     die('invalid section type');
 }
 
-$modinfo = get_fast_modinfo($COURSE);
-$courseformat = course_get_format($COURSE);
+$helper = new format_helper($COURSE);
 
-$lastsection = max(array_keys($modinfo->get_section_info_all())) + 1;
-course_create_sections_if_missing($COURSE, $lastsection);
-
-// Increase the course section count.
-$formatopts = $courseformat->get_format_options();
-$numsections = $formatopts['numsections'] + 1;
-$data = array(
-    'numsections' => $numsections,
-);
-$courseformat->update_course_format_options($data);
-
-// Set the section details.
-$modinfo = get_fast_modinfo($COURSE);   // Reload.
-$info = $modinfo->get_section_info($lastsection);
-$data = array(
-    'id' => $info->id,
-    'sectiontype' => $type,
-);
-$courseformat->update_section_format_options($data);
-
-// Move the section into place.
-if (!move_section_to($COURSE, $lastsection, 1)) {
-    throw new coding_exception('move_section_to failed');
-}
+$section = $helper->create_section($type);
 
 redirect($returnurl);

@@ -1,28 +1,58 @@
-.course-content ul.usqflexopen {margin:0;}
-.course-content ul.usqflexopen li.section {list-style: none;margin:0 0 5px 0;padding:0;}
-.course-content ul.usqflexopen li.section .content {margin:0 40px;}
-.course-content ul.usqflexopen li.section .left,
-.course-content ul.usqflexopen li.section .right {width:40px;padding: 0 6px;}
-.course-content ul.usqflexopen li.section .right img.icon { padding: 0 0 4px 0;}
-.course-content ul.usqflexopen li.section .left {padding-top:22px;text-align: right;}
-.jsenabled .course-content ul.usqflexopen li.section .left,
-.jsenabled .course-content ul.usqflexopen li.section .right {width:auto;}
-.course-content ul.usqflexopen li.section .left .section-handle img.icon { padding:0; vertical-align: baseline; }
-.course-content ul.usqflexopen li.section .section_action_menu .textmenu,
-.course-content ul.usqflexopen li.section .section_action_menu .menu-action-text { white-space: nowrap; }
+/* Styles common to all themes. */
 
-.course-content ul.usqflexopen li.section .sectiontype {
+body.format-usqflexopen .course-content .sectionname .weeknum,
+body.format-usqflexopen .course-content .section-title .weeknum {
+    font-size: 1rem;
+    color: #aaa;
+    padding-left: 1em;
+}
+
+body.format-usqflexopen .course-content .sectionname .sectiontype,
+body.format-usqflexopen .course-content .section-title .sectiontype {
     display: inline-block;
-    padding: 0.25rem 0.4rem;
-    font-size: 60%;
+    padding: 0.2rem 0.3rem;
+    font-size: 65%;
     line-height: 1;
     font-weight: bold;
     color: #fff;
-    vertical-align: baseline;
     float: right;
-    border-radius: 0.25em;
+    border-radius: 0.3rem;
+    border: 2px solid;
 }
-.course-content ul.usqflexopen li.section .sectiontype-assess { background-color: #b94a48; }
-.course-content ul.usqflexopen li.section .sectiontype-getstarted { background-color: #333333; }
-.course-content ul.usqflexopen li.section .sectiontype-week { background-color: #468847; }
-.course-content ul.usqflexopen li.section .sectiontype-topic { background-color: #3a87ad; }
+body.format-usqflexopen .course-content .sectionname .sectiontype-assess,
+body.format-usqflexopen .course-content .section-title .sectiontype-assess {
+    background-color: #b94a48;
+    border-color: #b94a48;
+}
+body.format-usqflexopen .course-content .sectionname .sectiontype-getstarted,
+body.format-usqflexopen .course-content .section-title .sectiontype-getstarted {
+    background-color: #333;
+    border-color: #333;
+}
+body.format-usqflexopen .course-content .sectionname .sectiontype-week,
+body.format-usqflexopen .course-content .section-title .sectiontype-week {
+    background-color: #468847;
+    border-color: #468847;
+}
+body.format-usqflexopen .course-content .sectionname .sectiontype-topic,
+body.format-usqflexopen .course-content .section-title .sectiontype-topic {
+    background-color: #3a87ad;
+    border-color: #3a87ad;
+}
+body.format-usqflexopen .course-content .hidden .sectionname .sectiontype,
+body.format-usqflexopen .course-content .hidden .section-title .sectiontype {
+    background-color: transparent;
+    color: #6c757d;
+}
+
+#page-course-view-usqflexopen .usqflexopen-actions {
+    text-align: right;
+    list-style: none;
+}
+#page-course-view-usqflexopen .usqflexopen-actions li {
+    display: inline;
+    margin-left: 1em;
+}
+#page-course-view-usqflexopen .usqflexopen-actions .smallicon {
+    padding-right: 0.25em;
+}

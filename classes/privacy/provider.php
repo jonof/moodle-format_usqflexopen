@@ -15,17 +15,32 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * USQ Flexi course format
+ * USQ Flexi course format privacy provider.
  *
  * @package    format_usqflexopen
- * @copyright  2016 The University of Southern Queensland
+ * @copyright  2020 The University of Southern Queensland
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+namespace format_usqflexopen\privacy;
+
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2022020400;        // The current plugin version (Date: YYYYMMDDXX).
-$plugin->requires  = 2019111800;        // Requires this Moodle version.
-$plugin->component = 'format_usqflexopen';    // Full name of the plugin (used for diagnostics).
-$plugin->dependencies = array(
-);
+/**
+ * USQ Flexi course format privacy provider.
+ *
+ * @copyright  2020 The University of Southern Queensland
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class provider implements \core_privacy\local\metadata\null_provider {
+
+    /**
+     * Get the language string identifier with the component's language
+     * file to explain why this plugin stores no data.
+     *
+     * @return  string
+     */
+    public static function get_reason() : string {
+        return 'privacy:metadata';
+    }
+}
